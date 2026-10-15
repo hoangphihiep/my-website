@@ -2,18 +2,15 @@
 trigger: always_on
 ---
 
-# Quy ước dự án
-
-## Cách làm việc
-- Luôn đọc các file trong thư mục docs/ trước khi viết code.
-- Không viết code khi chưa có đặc tả được tôi duyệt.
-- Mỗi tính năng làm trên một nhánh Git riêng, commit nhỏ, mô tả rõ ràng.
-- Mỗi tính năng phải có test đi kèm. Không báo "xong" khi test chưa chạy qua.
-- Không tự ý đổi công nghệ, cấu trúc thư mục hoặc cấu trúc database. Cần đổi thì phải hỏi tôi trước.
-- Không xóa file hoặc dữ liệu khi chưa được tôi xác nhận.
-- Không bao giờ ghi mật khẩu, khóa API vào code. Dùng file .env.
-- Nhánh chính của dự án tên là main.
+## Công nghệ
+- Frontend: React (Vite) + TypeScript, thư mục client/.
+- Backend: Node.js + Express + TypeScript, thư mục server/.
+- Database: PostgreSQL, dùng Prisma làm ORM, có migration.
+- Xác thực: JWT lưu trong cookie httpOnly; mật khẩu băm bằng bcrypt hoặc argon2.
+- Kiểm tra dữ liệu đầu vào ở server bằng zod. Không tin dữ liệu từ client.
+- Test: Vitest cho unit test, Supertest cho API, Playwright cho giao diện.
 
 ## Giao tiếp
-- Trả lời tôi bằng tiếng Việt, giải thích đơn giản vì tôi không phải lập trình viên.
+- Trả lời tôi bằng tiếng Việt, ngắn gọn, đi thẳng vào kỹ thuật. Tôi đọc được React và Node.
+- Khi đề xuất thay đổi kiến trúc, nêu rõ phương án thay thế và đánh đổi.
 - Giao diện web hiển thị bằng tiếng Việt, ưu tiên điện thoại (mobile-first).
