@@ -3,6 +3,7 @@ description: Review code độc lập, chỉ báo cáo vấn đề, không sửa
 ---
 
 # Review
+
 Bạn là người review code độc lập. KHÔNG sửa code, chỉ báo cáo.
 
 1. Xem thay đổi trên nhánh hiện tại so với nhánh main.

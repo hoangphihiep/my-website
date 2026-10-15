@@ -1,4 +1,5 @@
 # KẾ HOẠCH PHÁT TRIỂN (DEVELOPMENT ROADMAP)
+
 ## Dự án: Website Điện Máy VietElectro
 
 Lộ trình được phân rã thành các tính năng nhỏ độc lập. **Mỗi nhiệm vụ được thiết kế vừa vặn để hoàn thành trọn vẹn trong một phiên làm việc (Single Coding Session)**.
@@ -44,6 +45,7 @@ gantt
 ## Giai đoạn 1: Khởi tạo Hạ tầng & Cơ sở Dữ liệu
 
 ### [Phiên 1.1] Khởi tạo Cấu trúc Monorepo, Công cụ Kiểm thử & CI Pipeline
+
 - **Mục tiêu**: Thiết lập cấu trúc monorepo `client/` và `server/`, thiết lập linting, kiểm tra kiểu nghiêm ngặt, hạ tầng test, tệp bỏ qua và tích hợp liên tục (CI).
 - **Nhiệm vụ cụ thể**:
   - Khởi tạo thư mục `client/` bằng React (Vite) + TypeScript + CSS Modules.
@@ -56,6 +58,7 @@ gantt
   - Thiết lập **GitHub Actions** CI workflow (`.github/workflows/ci.yml`): Tự động kích hoạt khi có Pull Request hoặc Push vào nhánh `main` để chạy kiểm tra 3 bước: `lint`, `tsc` (typecheck), và `test` (Vitest).
 
 ### [Phiên 1.2] Lược đồ Prisma & Ràng buộc CHECK qua Migration Thủ công
+
 - **Mục tiêu**: Kết nối CSDL PostgreSQL, tạo schema Prisma và áp dụng các ràng buộc toàn vẹn dữ liệu bằng quy trình migration thủ công.
 - **Nhiệm vụ cụ thể**:
   - Tạo file `server/prisma/schema.prisma` với 9 models (`User`, `Category`, `Brand`, `Product`, `ProductImage`, `ProductSpecification`, `Order`, `OrderItem`, `Contact`).
@@ -68,6 +71,7 @@ gantt
 ## Giai đoạn 2: Backend Core - Xác thực & Base Middlewares
 
 ### [Phiên 2.1] Thiết lập Middlewares Nền tảng (Trust Proxy, Zod, Rate Limit, CORS, Error Handler)
+
 - **Mục tiêu**: Xây dựng lớp phòng vệ bảo mật, bóc tách IP thật theo số hop proxy, cấu hình CORS an toàn và chuẩn hóa request/response.
 - **Nhiệm vụ cụ thể**:
   - Cấu hình trust proxy linh hoạt với kiểm tra khởi động bắt buộc (Fail-fast):
@@ -83,6 +87,7 @@ gantt
   - Cấu hình CookieParser, Helmet.
 
 ### [Phiên 2.2] Module Xác thực (Auth API) với Cookie httpOnly & Seed Admin ENV
+
 - **Mục tiêu**: Hoàn thiện API Đăng ký, Đăng nhập, Đăng xuất, middleware phân quyền và nạp ngay tài khoản Admin đầu tiên từ biến môi trường để kiểm thử.
 - **Nhiệm vụ cụ thể**:
   - Xây dựng Zod schema đăng ký (mật khẩu >= 8 ký tự, strip `role`, gán cứng `CUSTOMER`).
@@ -98,6 +103,7 @@ gantt
 ## Giai đoạn 3: Module Catalog - Danh mục, Thương hiệu, Sản phẩm & Seed
 
 ### [Phiên 3.1] Xử lý Tải ảnh An toàn Qua Storage Adapter & Dọn Ảnh Mồ Côi 24 Giờ
+
 - **Mục tiêu**: Xây dựng endpoint upload 1 ảnh/request an toàn qua Storage Adapter (R2/S3 tiền tố temp/), client điều phối gửi tối đa 3 request song song, đồng nhất trên mọi môi trường và quản lý ảnh mồ côi.
 - **Nhiệm vụ cụ thể**:
   - API `POST /api/v1/products/upload-image`: Multer nhận đúng 1 tệp ảnh / request vào RAM (MemoryStorage), tối đa 5MB.
@@ -109,6 +115,7 @@ gantt
   - Object Lifecycle Rule (hoặc Cron Job định kỳ) tự động quét và xóa sạch các file tạm có tiền tố `temp/` quá 24 giờ.
 
 ### [Phiên 3.2] API CRUD Danh mục & Thương hiệu
+
 - **Mục tiêu**: Quản trị danh mục phân cấp đa tầng và thương hiệu sản phẩm.
 - **Nhiệm vụ cụ thể**:
   - API lấy cây danh mục đa cấp (hỗ trợ parent - child) và danh sách thương hiệu.
@@ -116,6 +123,7 @@ gantt
   - Logic chặn xóa danh mục/thương hiệu nếu còn sản phẩm trực thuộc.
 
 ### [Phiên 3.3] API Sản phẩm, Xóa An toàn & Tìm kiếm Không Dấu (đ/Đ)
+
 - **Mục tiêu**: Quản trị sản phẩm, xử lý tìm kiếm không dấu chuẩn xác và xóa sản phẩm thông minh không giả định mã lỗi.
 - **Nhiệm vụ cụ thể**:
   - Xây dựng hàm `removeVietnameseTones()` bóc tách Unicode NFD và xử lý riêng biệt `đ`/`Đ` thành `d`.
@@ -130,6 +138,7 @@ gantt
   - Ghi chú kiến trúc: Index B-Tree đáp ứng tốt cho v1 (< vài nghìn sản phẩm), quy hoạch mở rộng `pg_trgm` GIN index cho v2.
 
 ### [Phiên 3.4] Script Seeding Dữ liệu Mẫu Catalog & Ảnh Minh Họa Tự Tạo
+
 - **Mục tiêu**: Nạp dữ liệu mẫu ban đầu cho danh mục, hãng và thiết bị điện máy để chạy thử nghiệm độc lập không phụ thuộc dữ liệu ngoài.
 - **Nhiệm vụ cụ thể**:
   - Viết `server/prisma/seed-catalog.ts` nạp danh mục, thương hiệu và thông số kỹ thuật điện máy.
@@ -141,6 +150,7 @@ gantt
 ## Giai đoạn 4: Quản lý Đơn hàng, Tồn kho & Tra cứu Đơn
 
 ### [Phiên 4.1] Nghiệp vụ Tạo Đơn hàng COD, Validation Chặt Chẽ & Phòng chống Deadlock
+
 - **Mục tiêu**: Xây dựng API đặt hàng COD an toàn, validate toàn diện qua Zod, gộp dòng trùng và sắp xếp ngoài transaction, xử lý retry mã đơn ngoài transaction.
 - **Nhiệm vụ cụ thể**:
   - Zod validation cho form tạo đơn:
@@ -164,6 +174,7 @@ gantt
     - Ràng buộc `UNIQUE` trên `orderCode` là nguồn sự thật: Bỏ hoàn toàn bước `findUnique` kiểm tra trước; bắt lỗi Prisma `P2002` ở **NGOÀI transaction**, **chỉ retry tối đa 3 lần nếu `meta.target` chứa `orderCode`** (các lỗi P2002 khác quăng lỗi bình thường).
 
 ### [Phiên 4.2] Kiểm thử Tích Hợp Concurrency & Data Integrity trên PostgreSQL Thật
+
 - **Mục tiêu**: Dùng Supertest kiểm thử tự động toàn diện logic tạo đơn và tính toàn vẹn dữ liệu kết nối trực tiếp CSDL PostgreSQL thật (không dùng Mock).
 - **Nhiệm vụ cụ thể**:
   - **Test Concurrency chống over-selling**:
@@ -188,6 +199,7 @@ gantt
     - Xác nhận chỉ retry khi lỗi P2002 liên quan đến `orderCode`; các lỗi P2002 khác bị từ chối ngay.
 
 ### [Phiên 4.3] Quản lý Trạng thái Đơn hàng & Cơ chế Hoàn Kho Độc Nhất
+
 - **Mục tiêu**: Xây dựng luồng chuyển đổi trạng thái đơn hàng theo State Machine.
 - **Nhiệm vụ cụ thể**:
   - Triển khai máy trạng thái: `PENDING` -> `PROCESSING` -> `SHIPPING` -> `COMPLETED` / `CANCELLED`.
@@ -195,6 +207,7 @@ gantt
   - Khi đơn sang `CANCELLED`: Kiểm tra trạng thái cũ trong transaction, thực hiện hoàn trả tồn kho đúng một lần duy nhất. Chặn thao tác hủy nếu đơn đã hoàn tất hoặc đã bị hủy trước đó.
 
 ### [Phiên 4.4] Tra cứu Đơn hàng Bảo mật & API Khách hàng
+
 - **Mục tiêu**: Cho phép khách vãng lai tra cứu đơn hàng và xem danh sách đơn đã đặt.
 - **Nhiệm vụ cụ thể**:
   - API `POST /api/v1/orders/lookup`: Nhận body `{ orderCode, phone }`, tự động chuẩn hóa SĐT trước khi so khớp, áp dụng Rate Limit (10 req/1m).
@@ -206,6 +219,7 @@ gantt
 ## Giai đoạn 5: Frontend - Giao diện Mobile-First, Trang chủ & Danh mục
 
 ### [Phiên 5.1] Design System (CSS Modules) & Layout Khung (TopBar, Header, Footer)
+
 - **Mục tiêu**: Xây dựng nhận diện thương hiệu VietElectro chuẩn phong cách META.vn.
 - **Nhiệm vụ cụ thể**:
   - Thiết lập bảng màu CSS Variables: Đỏ thương mại `#D70018`, nền `#F8F9FA`, text typography tiếng Việt.
@@ -214,6 +228,7 @@ gantt
   - Xây dựng Footer: Đầy đủ chính sách (Vận chuyển 0đ, Bảo hành, Đổi trả, Thông tin cửa hàng).
 
 ### [Phiên 5.2] Trang chủ: Banner & Khối Sản phẩm Ngành hàng
+
 - **Mục tiêu**: Xây dựng trang chủ thu hút với các khối ngành hàng điện máy chủ lực.
 - **Nhiệm vụ cụ thể**:
   - Mega Menu danh mục đa tầng trên Desktop và Drawer menu vuốt mượt trên Mobile.
@@ -221,6 +236,7 @@ gantt
   - Khối sản phẩm nhóm theo ngành hàng: Tivi, Tủ lạnh, Máy giặt, Điều hòa, Gia dụng.
 
 ### [Phiên 5.3] Trang Danh mục & Bộ lọc Tìm kiếm Đa Tiêu chí
+
 - **Mục tiêu**: Trang duyệt sản phẩm với bộ lọc chuyên sâu cho điện máy.
 - **Nhiệm vụ cụ thể**:
   - Bộ lọc khoảng giá (dưới 5tr, 5-10tr, 10-20tr, trên 20tr hoặc tự nhập khoảng giá).
@@ -229,6 +245,7 @@ gantt
   - Thanh phân trang với URL query state đồng bộ.
 
 ### [Phiên 5.4] Trang Chi tiết Sản phẩm & Mục "Đã xem gần đây"
+
 - **Mục tiêu**: Trình bày thông tin kỹ thuật chuyên sâu và ghi nhớ lịch sử duyệt sản phẩm.
 - **Nhiệm vụ cụ thể**:
   - Gallery hình ảnh sản phẩm với thumbnail chuyển đổi tức thì.
@@ -241,6 +258,7 @@ gantt
 ## Giai đoạn 6: Frontend - Giỏ hàng, Đặt hàng COD & Quản lý Tài khoản
 
 ### [Phiên 6.1] Giỏ hàng (CartContext) & Kiểm soát Tồn kho Client
+
 - **Mục tiêu**: Quản lý giỏ hàng phía Client lưu trữ LocalStorage.
 - **Nhiệm vụ cụ thể**:
   - Thêm, bớt số lượng, xóa sản phẩm khỏi giỏ.
@@ -248,6 +266,7 @@ gantt
   - Drawer giỏ hàng nhanh và trang giỏ hàng chi tiết.
 
 ### [Phiên 6.2] Trang Thanh toán COD & Tra cứu Đơn hàng
+
 - **Mục tiêu**: Hoàn tất hành trình đặt mua hàng COD không cần đăng nhập.
 - **Nhiệm vụ cụ thể**:
   - Form đặt hàng COD: Họ tên, Số điện thoại, Tỉnh/Thành (dropdown chọn 34 đơn vị hành chính cấp tỉnh nạp từ file `client/src/data/provinces.ts`), Địa chỉ chi tiết (số nhà, đường, phường/xã), Ghi chú.
@@ -256,6 +275,7 @@ gantt
   - Trang Tra cứu đơn hàng: Form POST nhập Mã đơn + SĐT, hiển thị timeline trạng thái đơn.
 
 ### [Phiên 6.3] Trang Đăng ký, Đăng nhập, Hồ sơ cá nhân & Liên hệ
+
 - **Mục tiêu**: Quản trị tài khoản khách hàng cá nhân.
 - **Nhiệm vụ cụ thể**:
   - Form Đăng ký (mật khẩu >= 8 ký tự) & Đăng nhập (bảo vệ cookie httpOnly).
@@ -268,6 +288,7 @@ gantt
 ## Giai đoạn 7: Giao diện Quản trị viên (Admin Portal)
 
 ### [Phiên 7.1] Layout Quản trị & Màn hình Quản lý Sản phẩm (Upload ảnh)
+
 - **Mục tiêu**: Cung cấp công cụ cho chủ shop thêm/sửa sản phẩm và tải ảnh WebP.
 - **Nhiệm vụ cụ thể**:
   - Layout Admin với Sidebar điều hướng và Route Guard (chỉ mở cho role `ADMIN`).
@@ -275,6 +296,7 @@ gantt
   - Form Thêm/Sửa sản phẩm: Tải lên tối đa 5 ảnh, xem trước thumbnail, nhập bảng thông số kỹ thuật động theo nhóm.
 
 ### [Phiên 7.2] Quản lý Danh mục, Thương hiệu, Đơn hàng & Tin nhắn
+
 - **Mục tiêu**: Hoàn thiện toàn bộ các chức năng quản trị còn lại.
 - **Nhiệm vụ cụ thể**:
   - Quản lý Danh mục (hỗ trợ phân cấp cha/con) và Thương hiệu (logo hãng).
@@ -287,12 +309,14 @@ gantt
 ## Giai đoạn 8: Kiểm thử Toàn diện (Playwright E2E), Tối ưu & Đóng gói Triển khai
 
 ### [Phiên 8.1] Kiểm thử Tự động E2E với Playwright
+
 - **Mục tiêu**: Tự động hóa kiểm thử toàn bộ hành trình người dùng trên môi trường giả lập Mobile.
 - **Nhiệm vụ cụ thể**:
   - Kịch bản 1 (Khách mua hàng): Mở trang chủ -> Tìm kiếm "may giat" -> Lọc theo giá -> Chọn sản phẩm -> Thêm vào giỏ -> Đặt hàng COD -> Tra cứu trạng thái đơn hàng vừa tạo.
   - Kịch bản 2 (Chủ shop duyệt đơn): Đăng nhập Admin -> Mở chi tiết đơn hàng mới -> Chuyển sang `Đang xử lý` -> Chuyển sang `Đang giao` -> Chuyển sang `Hoàn tất` (xác nhận tăng `soldCount`).
 
 ### [Phiên 8.2] Tối ưu Hiệu năng Mobile & Chuẩn bị Triển khai (Deploy Ready)
+
 - **Mục tiêu**: Đảm bảo tốc độ tải trang cao và cấu hình sẵn sàng đưa lên môi trường Production.
 - **Nhiệm vụ cụ thể**:
   - Đo đạc và tối ưu chỉ số Google Lighthouse Mobile (điểm Performance > 90, tối ưu nén ảnh WebP, lazy load component).

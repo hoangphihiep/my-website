@@ -3,6 +3,7 @@ description: Chạy test và kiểm tra tính năng theo tiêu chí nghiệm thu
 ---
 
 # Verify
+
 Kiểm tra tính năng vừa làm.
 
 1. Chạy lint và toàn bộ test, sửa đến khi qua hết.

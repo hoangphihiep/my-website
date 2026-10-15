@@ -1,4 +1,5 @@
 # THIẾT KẾ CƠ SỞ DỮ LIỆU (DATABASE SPECIFICATION)
+
 ## Dự án: Website Điện Máy VietElectro
 
 Hệ thống sử dụng **PostgreSQL (v15+)** kết hợp với **Prisma ORM**.
@@ -347,6 +348,7 @@ model Contact {
 Do Prisma ORM chưa hỗ trợ cú pháp `CHECK` constraint trực tiếp trong file `schema.prisma`, toàn bộ các ràng buộc nghiệp vụ ở tầng CSDL sẽ được thiết lập bằng SQL thủ công thông qua quy trình migration chuẩn:
 
 ### Quy trình 3 bước thực hiện:
+
 1. **Bước 1**: Tạo file migration rỗng (chưa áp dụng vào CSDL):
    ```bash
    npx prisma migrate dev --create-only --name add_custom_check_constraints
@@ -379,34 +381,35 @@ Khi Quản trị viên thực hiện yêu cầu xóa sản phẩm (`DELETE /api/
 Hệ thống không kiểm tra `count` trước để tránh race condition, mà thực hiện lệnh xóa cứng trực tiếp và bắt lỗi vi phạm ràng buộc khóa ngoại (Foreign Key Restrict từ `OrderItem`).
 
 ### Nguyên tắc Kỹ thuật Bắt buộc:
+
 1. **Hai thao tác độc lập, KHÔNG nằm chung Transaction**: Trong PostgreSQL, khi một câu lệnh gặp lỗi (vi phạm ràng buộc khóa ngoại), PostgreSQL sẽ hủy toàn bộ transaction (`transaction is aborted, commands ignored until end of transaction block`). Mọi câu lệnh tiếp theo trong block đó (kể cả `UPDATE`) đều sẽ bị từ chối. Vì vậy, **lệnh xóa cứng và lệnh fallback chuyển sang ẩn bắt buộc phải là 2 thao tác CSDL độc lập hoàn toàn, không bọc chung trong `prisma.$transaction`**.
 2. **Test tích hợp trên PostgreSQL thật là Nguồn sự thật**: Hệ thống không võ đoán hay phỏng đoán mã lỗi mà sử dụng Integration Test chạy trên **PostgreSQL thật** thử xóa sản phẩm có đơn hàng để xác nhận mã lỗi chính xác do Prisma Client / PostgreSQL driver ném ra (mã `P2003`), sau đó bắt lỗi đúng theo mã này.
 3. **Xóa file storage chỉ sau khi DB đã xóa xong; lỗi chỉ ghi log**: Chỉ khi lệnh xóa cứng bản ghi trong CSDL đã hoàn tất thành công, server mới tiến hành xóa file ảnh vật lý trên storage (thư mục `server/uploads/` hoặc Cloudflare R2 / S3). Nếu việc xóa file vật lý thất bại (do mạng/storage), **chỉ ghi log lỗi (`logger.error`) chứ tuyệt đối không ném lỗi (không throw error)** làm ảnh hưởng đến response thành công của API.
 4. **Cấu trúc Response chuẩn**: Luôn tuân thủ định dạng `{ success, data, message }`, đặt `isArchived` bên trong `data`.
 
 ```typescript
-import { Prisma } from "@prisma/client";
-import { prisma } from "../config/db";
-import { deleteStorageFiles } from "../utils/storage";
-import { logger } from "../utils/logger";
+import { Prisma } from '@prisma/client';
+import { prisma } from '../config/db';
+import { deleteStorageFiles } from '../utils/storage';
+import { logger } from '../utils/logger';
 
 export async function deleteProductService(productId: string) {
   // 1. Đọc trước danh sách URL ảnh để chuẩn bị dọn dẹp nếu xóa cứng thành công
   const productImages = await prisma.productImage.findMany({
     where: { productId },
-    select: { url: true }
+    select: { url: true },
   });
 
   try {
     // 2. Thao tác ĐỘC LẬP 1: Thử xóa cứng sản phẩm trực tiếp (không nằm trong transaction chung với fallback)
     await prisma.product.delete({
-      where: { id: productId }
+      where: { id: productId },
     });
 
     // 3. Xóa cứng DB thành công -> Tiến hành xóa các file ảnh vật lý trên storage
     if (productImages.length > 0) {
       try {
-        await deleteStorageFiles(productImages.map(img => img.url));
+        await deleteStorageFiles(productImages.map((img) => img.url));
       } catch (fileErr) {
         // Lỗi xóa file vật lý chỉ ghi log cảnh báo, không throw error làm gián đoạn response thành công
         logger.error(`Lỗi dọn dẹp file ảnh storage cho sản phẩm ${productId}:`, fileErr);
@@ -416,21 +419,22 @@ export async function deleteProductService(productId: string) {
     return {
       success: true,
       data: { isArchived: false },
-      message: "Đã xóa vĩnh viễn sản phẩm và dọn dẹp các tệp ảnh liên quan thành công."
+      message: 'Đã xóa vĩnh viễn sản phẩm và dọn dẹp các tệp ảnh liên quan thành công.',
     };
   } catch (error) {
     // 4. Bắt lỗi vi phạm ràng buộc khóa ngoại (Xác nhận từ integration test trên Postgres thật là nguồn sự thật)
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
       // Thao tác ĐỘC LẬP 2: Fallback cập nhật sản phẩm sang trạng thái Ẩn
       await prisma.product.update({
         where: { id: productId },
-        data: { isActive: false }
+        data: { isActive: false },
       });
 
       return {
         success: true,
         data: { isArchived: true },
-        message: "Sản phẩm đã có đơn hàng trong quá khứ nên không thể xóa vĩnh viễn; hệ thống đã tự động chuyển sang trạng thái Ẩn."
+        message:
+          'Sản phẩm đã có đơn hàng trong quá khứ nên không thể xóa vĩnh viễn; hệ thống đã tự động chuyển sang trạng thái Ẩn.',
       };
     }
 
@@ -443,14 +447,14 @@ export async function deleteProductService(productId: string) {
 
 ## 5. Ma trận Phân quyền Truy cập Dữ liệu (Access Control Matrix)
 
-| Bảng dữ liệu | Khách vãng lai (Guest) | Khách đã đăng nhập (Customer) | Quản trị viên (Admin) | Ghi chú bảo mật |
-| :--- | :--- | :--- | :--- | :--- |
-| **`User`** | Không có quyền | Xem/Sửa thông tin của chính mình | Xem danh sách tất cả tài khoản | Mật khẩu băm bằng Argon2, tuyệt đối không trả về `passwordHash`. Bỏ qua mọi trường `role` client gửi khi đăng ký. |
-| **`Category`** | Chỉ xem (`isActive=true`) | Chỉ xem | Toàn quyền (Tạo/Sửa/Xóa/Đổi thứ tự) | Chặn xóa nếu còn sản phẩm trực thuộc. |
-| **`Brand`** | Chỉ xem (`isActive=true`) | Chỉ xem | Toàn quyền (Tạo/Sửa/Xóa) | Chặn xóa nếu còn sản phẩm mang thương hiệu này. |
-| **`Product`** | Chỉ xem sản phẩm kích hoạt (`isActive=true`) | Chỉ xem sản phẩm kích hoạt | Toàn quyền (Thêm/Sửa/Ẩn/Xóa) | Tìm kiếm qua `normalizedName`. Không xóa cứng sản phẩm đã có đơn. Sắp xếp bán chạy qua `soldCount`. |
-| **`ProductImage`** | Chỉ xem ảnh theo sản phẩm | Chỉ xem ảnh theo sản phẩm | Toàn quyền (Upload/Xóa/Đặt ảnh đại diện) | Ảnh upload luôn re-encode WebP, xóa file gốc, kiểm tra pixel < 16MP. |
-| **`ProductSpecification`** | Chỉ xem thông số kỹ thuật | Chỉ xem thông số kỹ thuật | Toàn quyền (Thêm/Sửa/Xóa theo nhóm) | Dữ liệu cấu trúc bảng phân nhóm. |
-| **`Order`** | Tạo đơn mới (COD); Tra cứu **chỉ đúng đơn của mình** bằng Mã đơn + SĐT qua POST | Tạo đơn mới; Xem danh sách đơn của tài khoản mình | Toàn quyền xem tất cả đơn, cập nhật trạng thái theo State Machine | Tra cứu public qua POST `/api/v1/orders/lookup`. Hoàn kho đúng 1 lần khi hủy đơn. |
-| **`OrderItem`** | Xem các món trong đơn tra cứu hợp lệ | Xem các món trong đơn của mình | Toàn quyền xem | Khóa dữ liệu (`Restrict`) khi sản phẩm đã phát sinh đơn. |
-| **`Contact`** | Tạo mới (Gửi phản hồi) | Tạo mới (Gửi phản hồi) | Xem danh sách, cập nhật trạng thái đã đọc/trả lời | Áp dụng Rate Limit chống spam. |
+| Bảng dữ liệu               | Khách vãng lai (Guest)                                                          | Khách đã đăng nhập (Customer)                     | Quản trị viên (Admin)                                             | Ghi chú bảo mật                                                                                                   |
+| :------------------------- | :------------------------------------------------------------------------------ | :------------------------------------------------ | :---------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| **`User`**                 | Không có quyền                                                                  | Xem/Sửa thông tin của chính mình                  | Xem danh sách tất cả tài khoản                                    | Mật khẩu băm bằng Argon2, tuyệt đối không trả về `passwordHash`. Bỏ qua mọi trường `role` client gửi khi đăng ký. |
+| **`Category`**             | Chỉ xem (`isActive=true`)                                                       | Chỉ xem                                           | Toàn quyền (Tạo/Sửa/Xóa/Đổi thứ tự)                               | Chặn xóa nếu còn sản phẩm trực thuộc.                                                                             |
+| **`Brand`**                | Chỉ xem (`isActive=true`)                                                       | Chỉ xem                                           | Toàn quyền (Tạo/Sửa/Xóa)                                          | Chặn xóa nếu còn sản phẩm mang thương hiệu này.                                                                   |
+| **`Product`**              | Chỉ xem sản phẩm kích hoạt (`isActive=true`)                                    | Chỉ xem sản phẩm kích hoạt                        | Toàn quyền (Thêm/Sửa/Ẩn/Xóa)                                      | Tìm kiếm qua `normalizedName`. Không xóa cứng sản phẩm đã có đơn. Sắp xếp bán chạy qua `soldCount`.               |
+| **`ProductImage`**         | Chỉ xem ảnh theo sản phẩm                                                       | Chỉ xem ảnh theo sản phẩm                         | Toàn quyền (Upload/Xóa/Đặt ảnh đại diện)                          | Ảnh upload luôn re-encode WebP, xóa file gốc, kiểm tra pixel < 16MP.                                              |
+| **`ProductSpecification`** | Chỉ xem thông số kỹ thuật                                                       | Chỉ xem thông số kỹ thuật                         | Toàn quyền (Thêm/Sửa/Xóa theo nhóm)                               | Dữ liệu cấu trúc bảng phân nhóm.                                                                                  |
+| **`Order`**                | Tạo đơn mới (COD); Tra cứu **chỉ đúng đơn của mình** bằng Mã đơn + SĐT qua POST | Tạo đơn mới; Xem danh sách đơn của tài khoản mình | Toàn quyền xem tất cả đơn, cập nhật trạng thái theo State Machine | Tra cứu public qua POST `/api/v1/orders/lookup`. Hoàn kho đúng 1 lần khi hủy đơn.                                 |
+| **`OrderItem`**            | Xem các món trong đơn tra cứu hợp lệ                                            | Xem các món trong đơn của mình                    | Toàn quyền xem                                                    | Khóa dữ liệu (`Restrict`) khi sản phẩm đã phát sinh đơn.                                                          |
+| **`Contact`**              | Tạo mới (Gửi phản hồi)                                                          | Tạo mới (Gửi phản hồi)                            | Xem danh sách, cập nhật trạng thái đã đọc/trả lời                 | Áp dụng Rate Limit chống spam.                                                                                    |

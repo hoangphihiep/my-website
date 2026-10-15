@@ -1,9 +1,11 @@
 # TÀI LIỆU YÊU CẦU SẢN PHẨM (PRD)
+
 ## Dự án: Website Thương Mại Điện Tử Điện Máy & Gia Dụng (VietElectro)
 
 ---
 
 ## 1. Mục tiêu Dự án
+
 - **Mục tiêu tổng quát**: Xây dựng nền tảng thương mại điện tử chuyên ngành điện máy, điện tử và gia dụng tại Việt Nam (Tivi, Tủ lạnh, Điều hòa, Máy giặt, Gia dụng nhà bếp...), hướng tới trải nghiệm mua sắm nhanh chóng, tin cậy, thanh toán COD minh bạch.
 - **Mục tiêu người dùng**:
   - Giao diện thân thiện, ưu tiên tối đa cho thiết bị di động (Mobile-First).
@@ -18,6 +20,7 @@
 ## 2. Đối tượng Người dùng & Chân dung Khách hàng
 
 ### 2.1. Khách mua lẻ (End-User / Customer)
+
 - **Hành vi**: Truy cập chủ yếu bằng smartphone (chiếm >80%), tìm kiếm thiết bị điện máy gia đình, so sánh giá cả, đối chiếu thông số kỹ thuật (công suất, kích thước, công nghệ tiết kiệm điện Inverter).
 - **Kỳ vọng**:
   - Xem ngay trạng thái còn hàng/hết hàng.
@@ -26,27 +29,31 @@
   - Tra cứu được tiến độ giao hàng mà không cần ghi nhớ mật khẩu tài khoản.
 
 ### 2.2. Khách hàng thân thiết (Registered Customer)
+
 - Khách hàng đã tạo tài khoản để theo dõi lịch sử các lần mua sắm, lưu sẵn địa chỉ nhận hàng để tiện đặt lại trong tương lai.
 
 ### 2.3. Quản trị viên (Admin / Shop Owner)
+
 - Chủ shop hoặc nhân viên bán hàng sử dụng laptop/máy tính để quản lý kho sản phẩm, duyệt đơn hàng, cập nhật lộ trình giao vận và phản hồi tin nhắn của khách.
 
 ---
 
 ## 3. Phong cách Thiết kế & Trải nghiệm (UI/UX)
+
 - **Tư tưởng chủ đạo**: Lấy cảm hứng tổ chức bố cục từ các hệ thống siêu thị điện máy lớn tại Việt Nam (tiêu biểu như META.vn), được thiết kế lại độc lập với bộ nhận diện riêng:
   - **Màu sắc**: Màu đỏ đậm thương mại (#D70018 / #C70015) làm điểm nhấn cho các nút kêu gọi hành động (CTA), thông báo giá khuyến mãi; nền sáng (#F8F9FA và #FFFFFF) tạo sự thanh thoát, dễ đọc thông số.
   - **Thanh trên cùng (Top Bar)**: Hiển thị Hotline bán hàng, thông tin bảo hành, tra cứu đơn hàng nhanh, giỏ hàng nổi bật kèm số lượng và nút đăng nhập/tài khoản.
-  - **Menu danh mục (Multi-level Navigation)**: Hỗ trợ phân cấp 2-3 tầng (Ví dụ: *Điện lạnh* -> *Tủ lạnh* -> *Tủ lạnh Side by side*).
+  - **Menu danh mục (Multi-level Navigation)**: Hỗ trợ phân cấp 2-3 tầng (Ví dụ: _Điện lạnh_ -> _Tủ lạnh_ -> _Tủ lạnh Side by side_).
   - **Trang chủ**: Banner khuyến mãi nổi bật, thanh tìm kiếm thông minh, các khối sản phẩm được nhóm theo ngành hàng chủ lực (Tivi - Âm thanh, Tủ lạnh - Điện lạnh, Máy giặt - Sấy, Điều hòa - Quạt mát, Gia dụng thông minh).
   - **Chân trang (Footer)**: Đầy đủ chính sách (Vận chuyển, Bảo hành - Đổi trả, Hướng dẫn mua hàng, Cam kết chính hãng, Thông tin liên hệ shop).
-- **Yêu cầu bản quyền**: Không sao chép logo, hình ảnh, bài viết của META.vn hay bất kỳ bên nào; sử dụng hệ thống dữ liệu mẫu và tên thương hiệu giả định riêng (*VietElectro*).
+- **Yêu cầu bản quyền**: Không sao chép logo, hình ảnh, bài viết của META.vn hay bất kỳ bên nào; sử dụng hệ thống dữ liệu mẫu và tên thương hiệu giả định riêng (_VietElectro_).
 
 ---
 
 ## 4. Phạm vi Tính năng Phiên bản 1 (v1 Scope)
 
 ### 4.1. Dành cho Khách hàng
+
 1. **Duyệt danh mục & Thương hiệu**:
    - Menu danh mục đa cấp, xem sản phẩm theo danh mục hoặc theo từng hãng sản xuất (Samsung, LG, Panasonic, Daikin, Sony, Casper...).
 2. **Tìm kiếm, Lọc & Phân trang**:
@@ -77,6 +84,7 @@
    - Gửi yêu cầu tư vấn/hỗ trợ kèm họ tên, SĐT, email, nội dung.
 
 ### 4.2. Dành cho Quản trị viên (Admin)
+
 1. **Quản lý Danh mục (Categories)**: Thêm, sửa, xóa danh mục, hỗ trợ danh mục cha/con, cập nhật thứ tự hiển thị.
 2. **Quản lý Thương hiệu (Brands)**: Thêm, sửa, xóa hãng sản xuất và logo hãng.
 3. **Quản lý Sản phẩm (Products)**:
@@ -95,7 +103,9 @@
 ---
 
 ## 5. Ngoài phạm vi Phiên bản 1 (LÀM SAU - Out of Scope for v1)
+
 Các tính năng sau đây **TUYỆT ĐỐI KHÔNG** triển khai trong phiên bản đầu để đảm bảo tiến độ và độ ổn định của hệ thống lõi:
+
 1. **Thanh toán trực tuyến**: Không tích hợp cổng VNPAY, MoMo, ZaloPay hay cổng thẻ quốc tế (Chỉ dùng COD).
 2. **Mua hàng trả góp**: Không làm tính năng xét duyệt trả góp 0% qua công ty tài chính hoặc qua thẻ tín dụng.
 3. **Flash Sale & Mã giảm giá nâng cao**: Không làm đồng hồ đếm ngược Flash sale, không làm hệ thống voucher coupon phức tạp.

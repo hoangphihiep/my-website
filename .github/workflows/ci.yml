@@ -24,10 +24,13 @@ jobs:
       - name: Cài đặt dependencies
         run: npm ci
 
+      - name: Kiểm tra định dạng mã nguồn (Prettier)
+        run: npm run format:check
+
       - name: Chạy ESLint (Client & Server)
         run: npm run lint
 
-      - name: Kiểm tra kiểu TypeScript (tsc --noEmit)
+      - name: Kiểm tra kiểu TypeScript (tsc)
         run: npm run typecheck
 
       - name: Chạy Unit & Integration Tests (Vitest)
