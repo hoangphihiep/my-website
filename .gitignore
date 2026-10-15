@@ -46,6 +46,11 @@ out/
 coverage/
 *.lcov
 .nyc_output/
+playwright-report/
+test-results/
+
+# Uploads
+server/uploads/
 
 # Cache directories
 .cache/
