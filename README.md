@@ -39,6 +39,7 @@ cp server/.env.example server/.env
 ```
 
 Các biến môi trường cơ bản:
+
 - `PORT`: Cổng máy chủ backend (mặc định: `5000`).
 - `NODE_ENV`: Môi trường thực thi (`development` | `production` | `test`).
 - `TRUST_PROXY_HOPS`: Số hop reverse proxy (Bắt buộc $\ge 0$; môi trường local dev đặt `0`, production/staging đặt $\ge 1$).
@@ -55,14 +56,17 @@ npm run dev:client
 npm run dev:server
 ```
 
+> [!NOTE]
+> **Vite Proxy trong Phát triển (Dev)**: Frontend Vite dev server (`http://localhost:5173`) được cấu hình tự động proxy các request có tiền tố `/api` sang backend server (`http://localhost:5000`). Nhờ đó, phía client có thể gọi API cùng origin mà không lo gặp lỗi CORS hay hạn chế cookie trong quá trình phát triển cục bộ.
+
 ---
 
 ## Kiểm thử & Chất lượng Mã nguồn
 
-| Lệnh | Mô tả |
-| :--- | :--- |
-| `npm run lint` | Chạy ESLint kiểm tra cú pháp và quy chuẩn code cho cả `client` và `server`. |
+| Lệnh                                     | Mô tả                                                                          |
+| :--------------------------------------- | :----------------------------------------------------------------------------- |
+| `npm run lint`                           | Chạy ESLint kiểm tra cú pháp và quy chuẩn code cho cả `client` và `server`.    |
 | `npm run typecheck` (hoặc `npm run tsc`) | Kiểm tra kiểu dữ liệu TypeScript (`tsc --noEmit`) cho cả `client` và `server`. |
-| `npm run test` | Chạy bộ kiểm thử tự động API (Vitest + Supertest) trên `server`. |
-| `npm run test:e2e` | Chạy bộ kiểm thử E2E Playwright trên trình duyệt. |
-| `npm run build` | Biên dịch TypeScript và đóng gói production cho cả `client` và `server`. |
+| `npm run test`                           | Chạy bộ kiểm thử tự động API (Vitest + Supertest) trên `server`.               |
+| `npm run test:e2e`                       | Chạy bộ kiểm thử E2E Playwright trên trình duyệt.                              |
+| `npm run build`                          | Biên dịch TypeScript và đóng gói production cho cả `client` và `server`.       |
