@@ -17,16 +17,19 @@
     "lint:client": "npm run lint --prefix client",
     "lint:server": "npm run lint --prefix server",
     "lint": "npm run lint:client && npm run lint:server",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck:client": "npm run typecheck --prefix client",
     "typecheck:server": "npm run typecheck --prefix server",
     "typecheck": "npm run typecheck:client && npm run typecheck:server",
     "tsc": "npm run typecheck",
-    "test:client": "npm run typecheck:client",
     "test:server": "npm run test --prefix server",
     "test": "npm run test:server",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.1"
+    "@playwright/test": "^1.50.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10"
   }
 }
