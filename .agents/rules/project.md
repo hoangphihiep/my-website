@@ -9,6 +9,7 @@ trigger: always_on
 - Xác thực: JWT lưu trong cookie httpOnly; mật khẩu băm bằng bcrypt hoặc argon2.
 - Kiểm tra dữ liệu đầu vào ở server bằng zod. Không tin dữ liệu từ client.
 - Test: Vitest cho unit test, Supertest cho API, Playwright cho giao diện.
+- Styling: CSS Modules + CSS Variables (design tokens), không dùng Tailwind.
 
 ## Giao tiếp
 - Trả lời tôi bằng tiếng Việt, ngắn gọn, đi thẳng vào kỹ thuật. Tôi đọc được React và Node.
