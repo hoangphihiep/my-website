@@ -9,41 +9,38 @@ export interface AppEnv {
   TRUST_PROXY_HOPS: number;
 }
 
-export function validateEnv(): AppEnv {
-  const rawHops = process.env.TRUST_PROXY_HOPS;
+export function validateEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
+  const rawHops = rawEnv.TRUST_PROXY_HOPS;
 
   // 1. Bắt buộc khai báo rõ ràng, không chấp nhận undefined, chuỗi rỗng hoặc định dạng không phải số nguyên không âm
   if (rawHops === undefined || rawHops === '' || !/^\d+$/.test(rawHops)) {
-    console.error(
-      'FATAL: Biến môi trường TRUST_PROXY_HOPS bắt buộc phải được khai báo rõ ràng và là một số nguyên không âm (>= 0). Ứng dụng từ chối khởi động!',
+    throw new Error(
+      'Biến môi trường TRUST_PROXY_HOPS bắt buộc phải được khai báo rõ ràng và là một số nguyên không âm (>= 0).',
     );
-    process.exit(1);
   }
 
   const trustProxyHops = parseInt(rawHops, 10);
 
+  const rawNodeEnv = rawEnv.NODE_ENV || 'development';
+  if (!['development', 'production', 'test'].includes(rawNodeEnv)) {
+    throw new Error(`Biến môi trường NODE_ENV không hợp lệ: "${rawNodeEnv}".`);
+  }
+  const nodeEnv = rawNodeEnv as AppEnv['NODE_ENV'];
+
   // 2. Ràng buộc nghiêm ngặt trên môi trường Production
-  if (process.env.NODE_ENV === 'production' && trustProxyHops < 1) {
-    console.error(
-      'FATAL: Trên môi trường Production, TRUST_PROXY_HOPS bắt buộc phải >= 1 (Render nằm sau ít nhất 1 reverse proxy). Ứng dụng từ chối khởi động!',
+  if (nodeEnv === 'production' && trustProxyHops < 1) {
+    throw new Error(
+      'Trên môi trường Production, TRUST_PROXY_HOPS bắt buộc phải >= 1 (Render nằm sau ít nhất 1 reverse proxy).',
     );
-    process.exit(1);
   }
 
-  const rawPort = process.env.PORT;
+  const rawPort = rawEnv.PORT;
   let port = 5000;
   if (rawPort !== undefined && rawPort !== '') {
     if (!/^\d+$/.test(rawPort)) {
-      console.error('FATAL: Biến môi trường PORT phải là số nguyên dương hợp lệ.');
-      process.exit(1);
+      throw new Error('Biến môi trường PORT phải là số nguyên dương hợp lệ.');
     }
     port = parseInt(rawPort, 10);
-  }
-
-  const nodeEnv = (process.env.NODE_ENV || 'development') as AppEnv['NODE_ENV'];
-  if (!['development', 'production', 'test'].includes(nodeEnv)) {
-    console.error(`FATAL: Biến môi trường NODE_ENV không hợp lệ: "${nodeEnv}".`);
-    process.exit(1);
   }
 
   return {
@@ -53,4 +50,17 @@ export function validateEnv(): AppEnv {
   };
 }
 
-export const env = validateEnv();
+let cachedEnv: AppEnv | null = null;
+
+export function getEnv(): AppEnv {
+  if (!cachedEnv) {
+    cachedEnv = validateEnv(process.env);
+  }
+  return cachedEnv;
+}
+
+export const env: AppEnv = new Proxy({} as AppEnv, {
+  get(_target, prop: keyof AppEnv) {
+    return getEnv()[prop];
+  },
+});
