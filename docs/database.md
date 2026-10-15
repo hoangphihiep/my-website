@@ -292,9 +292,9 @@ model Order {
   shippingAddress String      // Địa chỉ giao hàng đầy đủ
   note            String?
   paymentMethod   String      @default("COD") // Thanh toán khi nhận hàng
-  totalAmount     Int         // Tổng tiền hàng (VNĐ)
+  totalAmount     Int         // Tổng tiền hàng (VNĐ) - Kiểu Int32 (max ~2.14 tỷ), validation chặn <= 2 tỷ chống tràn số
   shippingFee     Int         @default(0)     // Quy tắc v1: Mặc định 0 VNĐ
-  finalAmount     Int         // Tổng thanh toán = totalAmount + shippingFee
+  finalAmount     Int         // Tổng thanh toán = totalAmount + shippingFee (<= 2 tỷ VNĐ)
   status          OrderStatus @default(PENDING)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt

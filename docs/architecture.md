@@ -276,28 +276,147 @@ Express API (POST /api/v1/products/upload-image)
 Trả về: { success: true, data: { tempStandardUrl, tempThumbUrl } }
 ```
 
-### 6.2. Cơ Chế Xử Lý Ảnh Mồ Côi (Khu Vực Lưu Trữ Tạm & Tác Vụ Dọn Rác 24 Giờ)
-Để giải quyết triệt để tình trạng "ảnh mồ côi" (Admin upload ảnh lên nhưng sau đó hủy form hoặc đóng trình duyệt mà không lưu sản phẩm):
-1. **Lưu trữ vào khu tạm (`uploads/temp/`)**: Khi upload qua API, ảnh WebP được lưu tại `server/uploads/temp/`.
-2. **Commit ảnh khi lưu sản phẩm**: Khi Admin bấm "Lưu sản phẩm" (`POST /api/v1/products` hoặc `PUT /api/v1/products/:id`), server sẽ chuyển (move) các file ảnh tương ứng từ `uploads/temp/` sang thư mục chính thức `uploads/products/` và lưu URL chính thức vào bảng `ProductImage`.
-3. **Tác vụ dọn rác định kỳ (Cron Job 24 Giờ)**:
-   - Hệ thống thiết lập một tác vụ định kỳ chạy mỗi ngày (ví dụ vào lúc 02:00 sáng).
-   - Tác vụ quét toàn bộ thư mục `uploads/temp/`, kiểm tra thời gian sửa đổi (`mtime`) của từng file.
-   - Mọi tệp ảnh tạm tồn tại **quá 24 giờ** mà không được commit sang sản phẩm chính thức sẽ bị xóa sạch khỏi đĩa cứng / storage, đảm bảo không gây lãng phí dung lượng lưu trữ.
+### 6.2. Cơ Chế Xử Lý Ảnh Tạm & Ảnh Mồ Côi Qua Storage Adapter (R2/S3)
+Để đảm bảo ứng dụng không phụ thuộc vào ổ đĩa cục bộ tạm thời (ephemeral disk) của Render (vốn bị xóa sạch khi deploy/restart và không thể chia sẻ giữa nhiều container):
+1. **Dùng chung Storage Adapter với Production**:
+   Cả môi trường Staging và Production đều sử dụng Storage Adapter thống nhất (Cloudflare R2 hoặc AWS S3 / MinIO):
+   - Khi upload qua API `POST /api/v1/products/upload-image`, ảnh WebP được đẩy trực tiếp lên Object Storage với **tiền tố (prefix) `temp/`**:
+     - Key bản chuẩn: `temp/${fileId}.webp`
+     - Key bản thumbnail: `temp/${fileId}_thumb.webp`
+   - API trả về cho client tên file tạm:
+     ```json
+     {
+       "success": true,
+       "data": {
+         "tempFileName": "550e8400-e29b-41d4-a716-446655440000.webp",
+         "previewUrl": "https://pub-r2.vietelectro.vn/temp/550e8400-e29b-41d4-a716-446655440000.webp"
+       }
+     }
+     ```
+2. **Client Chỉ Gửi Tên File Dạng `UUID.webp` & Server Kiểm Tra Bằng Regex**:
+   - Khi Admin bấm "Lưu sản phẩm" (`POST /api/v1/products` hoặc `PUT /api/v1/products/:id`), client **CHỈ ĐƯỢC PHÉP GỬI TÊN FILE TẠM** dạng mảng chuỗi `["550e8400-e29b-41d4-a716-446655440000.webp"]`, **tuyệt đối không gửi URL hoặc đường dẫn file**.
+   - Server kiểm tra nghiêm ngặt từng tên file bằng biểu thức chính quy (Regex):
+     ```typescript
+     const UUID_WEBP_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/i;
+     ```
+   - **Từ chối ngay lập tức** mọi chuỗi chứa ký tự phân cách thư mục (`/`, `\`, `..`), giao thức mạng (`http://`, `https://`) hoặc sai định dạng để triệt tiêu hoàn toàn nguy cơ Path Traversal, SSRF hoặc tham chiếu tệp tùy tiện.
+3. **Thao Tác "Di Chuyển" File Qua Storage Adapter (Copy-then-Delete)**:
+   Do Object Storage không có lệnh `move` nguyên thủy, thao tác di chuyển sang thư mục chính thức được thực hiện tuần tự qua Adapter:
+   - Bước 1: Gọi `storageAdapter.copyObject({ fromKey: `temp/${fileName}`, toKey: `products/${fileName}` })` (áp dụng cho cả bản chuẩn và thumbnail).
+   - Bước 2: Gọi `storageAdapter.deleteObject(`temp/${fileName}`)` để dọn file tạm.
+   - Bước 3: Lưu đường dẫn chính thức `products/${fileName}` vào CSDL bảng `ProductImage`.
+4. **Tác Vụ Dọn Rác Ảnh Mồ Côi 24 Giờ**:
+   - Bucket Object Storage được cấu hình **Object Lifecycle Rule** tự động hủy (expire/delete) mọi tệp tin có tiền tố `temp/` sau **24 giờ (1 ngày)** kể từ khi tải lên.
+   - Đối với môi trường dev/local không có Lifecycle Rule, hệ thống có tác vụ định kỳ (Cron Job) quét tiền tố `temp/` qua Storage Adapter và xóa các tệp có `LastModified` quá 24 giờ.
 
 ---
 
 ## 7. Nghiệp vụ Đơn hàng, Quản lý Tồn kho & Xóa Sản phẩm
 
-### 7.1. Nguyên tắc Xử lý API Tạo Đơn hàng
-1. **Client chỉ gửi `productId` và `quantity`**. Tuyệt đối không gửi giá, tên hay tổng tiền.
-2. **Gộp dòng trùng**: Tự động gộp các item cùng `productId` với `quantity = sum(quantity)`.
-3. **Sắp xếp theo `productId` tăng dần (Deadlock Prevention)**: Đảm bảo mọi transaction luôn xin khóa dòng theo cùng một trật tự từ điển duy nhất.
-4. **Kiểm tra trạng thái mở bán**: Chỉ chấp nhận sản phẩm có `isActive = true`.
+### 7.1. Nguyên tắc Xử lý API Tạo Đơn hàng & Validation Chặt Chẽ
+
+#### 1. Zod Schema Ràng Buộc Dữ Liệu Đầu Vào
+Kiểm tra nghiêm ngặt dữ liệu gửi lên từ client:
+- `customerName`: Giới hạn tối đa **100 ký tự** (`min(2)`, `max(100)`).
+- `customerPhone`: Được chuẩn hóa qua `normalizePhone` trước khi kiểm tra định dạng di động 10 số của Việt Nam (`^0[35789]\d{8}$`).
+- `customerEmail`: Email hợp lệ, giới hạn tối đa 100 ký tự (tùy chọn hoặc chuỗi rỗng).
+- `province`: Bắt buộc phải thuộc danh sách **34 đơn vị hành chính cấp tỉnh Việt Nam** (28 tỉnh, 6 thành phố).
+  - Server lưu giữ một bản sao độc lập danh sách này tại `server/src/data/provinces.ts`.
+  - Có bài test tự động (Unit test trong Vitest) xác nhận rằng danh sách `PROVINCES` tại `server/src/data/provinces.ts` và `client/src/data/provinces.ts` **hoàn toàn trùng khớp 100%** về cả số lượng (34 đơn vị) và tên gọi.
+- `detailAddress`: Tối thiểu 5 ký tự và tối đa **200 ký tự** (số nhà, tên đường, phường/xã).
+- `note`: Tùy chọn, tối đa **500 ký tự**.
+- `quantity`: Bắt buộc là số nguyên từ **1 đến 10** (`z.number().int().min(1).max(10)`).
+- `items`: Bắt buộc là mảng có từ **1 đến 20 dòng** (`z.array(...).min(1).max(20)`).
+- `productId`: Bắt buộc đúng định dạng UUID hợp lệ.
+- Body request tuyệt đối **không chứa `userId`, `price`, `totalAmount`**. Nếu client cố tình gửi các trường này, middleware Zod sẽ tự động loại bỏ (strip) hoàn toàn.
+
+```typescript
+import { z } from "zod";
+import { PROVINCE_NAMES } from "../data/provinces";
+import { normalizePhone } from "../utils/phone";
+
+export const createOrderSchema = z.object({
+  body: z.object({
+    customerName: z
+      .string()
+      .trim()
+      .min(2, "Họ tên phải có ít nhất 2 ký tự")
+      .max(100, "Họ tên không được vượt quá 100 ký tự"),
+    customerPhone: z
+      .string()
+      .trim()
+      .transform(normalizePhone)
+      .pipe(z.string().regex(/^0[35789]\d{8}$/, "Số điện thoại di động Việt Nam không hợp lệ")),
+    customerEmail: z
+      .string()
+      .trim()
+      .email("Email không hợp lệ")
+      .max(100, "Email không được vượt quá 100 ký tự")
+      .optional()
+      .or(z.literal("")),
+    province: z
+      .string()
+      .trim()
+      .refine((val) => PROVINCE_NAMES.includes(val as any), {
+        message: "Tỉnh/Thành phố không hợp lệ (phải thuộc danh sách 34 đơn vị hành chính cấp tỉnh)"
+      }),
+    detailAddress: z
+      .string()
+      .trim()
+      .min(5, "Địa chỉ chi tiết phải có ít nhất 5 ký tự")
+      .max(200, "Địa chỉ chi tiết không được vượt quá 200 ký tự"),
+    note: z
+      .string()
+      .trim()
+      .max(500, "Ghi chú không được vượt quá 500 ký tự")
+      .optional()
+      .or(z.literal("")),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().uuid("Mã sản phẩm phải là UUID hợp lệ"),
+          quantity: z
+            .number()
+            .int("Số lượng phải là số nguyên")
+            .min(1, "Số lượng tối thiểu là 1")
+            .max(10, "Số lượng tối đa mỗi mặt hàng là 10")
+        })
+      )
+      .min(1, "Đơn hàng phải có ít nhất 1 sản phẩm")
+      .max(20, "Đơn hàng không được vượt quá 20 loại sản phẩm")
+  })
+});
+```
+
+#### 2. Xác Thực `userId` Qua Middleware `optionalAuth`
+- Khách vãng lai (Guest) không có cookie phiên $\rightarrow$ `req.user = undefined` $\rightarrow$ `userId = null`.
+- Khách đã đăng nhập có cookie JWT hợp lệ $\rightarrow$ Middleware `optionalAuth` giải mã gán vào `req.user` $\rightarrow$ Controller truyền `userId = req.user.id` vào Service.
+- **Tuyệt đối không bao giờ nhận `userId` từ body request**.
+
+#### 3. Vị Trí Gộp Dòng Trùng & Sắp Xếp `productId` (Deadlock Prevention)
+- **Vị trí thực thi**: Nằm ở **tầng Service (`createOrderService`), ngay đầu hàm, TRƯỚC KHI mở transaction `prisma.$transaction`**.
+- **Mục đích & Ràng buộc sau khi gộp**:
+  - Gộp các dòng trùng cùng `productId`: `quantity = sum(quantity)`.
+  - **Kiểm tra giới hạn số lượng sau khi gộp**: Nếu tổng `quantity` của bất kỳ sản phẩm nào sau khi gộp **vượt quá 10**, server lập tức ném lỗi `AppError("Tổng số lượng cho mỗi sản phẩm trong đơn hàng không được vượt quá 10", 400)`.
+  - Sắp xếp mảng `productId` tăng dần theo thứ tự từ điển: Đảm bảo mọi transaction đồng thời luôn xin khóa dòng theo cùng một trật tự cố định, loại trừ 100% rủi ro deadlock trên PostgreSQL.
+  - Chuẩn bị dữ liệu hoàn tất trong bộ nhớ (In-memory) trước khi mở kết nối transaction giúp rút ngắn tối đa thời gian transaction mở và thời gian giữ khóa dòng.
+
+#### 4. Mã Đơn Hàng & Xử Lý Lỗi P2002 ở NGOÀI Transaction
+- Cột `orderCode` có ràng buộc `UNIQUE` trên PostgreSQL. Đây là **chốt chặn duy nhất và thực tế (Source of Truth)**. Bỏ hoàn toàn bước `findUnique` kiểm tra trùng mã trước trong transaction để tránh thừa truy vấn và race condition.
+- Khi hai request cùng sinh ra một mã đơn trùng lặp, câu lệnh `tx.order.create` sẽ ném lỗi Prisma Known Request Error mã `P2002`.
+- **Nguyên tắc kỹ thuật bắt buộc**:
+  - Vì PostgreSQL sẽ hủy toàn bộ transaction block khi một câu lệnh gặp lỗi vi phạm ràng buộc, việc bắt lỗi và thử lại (retry) **bắt buộc phải nằm ở NGOÀI transaction**.
+  - **Chỉ retry khi `meta.target` chứa `orderCode`**: Nếu lỗi `P2002` xuất phát từ các cột Unique khác (ví dụ nếu có), server quăng lỗi bình thường.
+  - Hàm `createOrderService` được bọc vòng lặp thử lại tối đa 3 lần ở cấp độ ngoài cùng.
+
+#### 5. Giới Hạn Chống Tràn Số Int32 Của `totalAmount`
+- Kiểu dữ liệu `Int` trong PostgreSQL là số nguyên 32-bit có dấu (Signed Int32), có giá trị trần là $+2,147,483,647$ (~2.147 tỷ VNĐ).
+- Để chống lỗi tràn số CSDL (Integer Overflow): Trong quá trình tính toán giá trị đơn hàng, nếu `totalAmount > 2_000_000_000` (2 tỷ VNĐ), hệ thống lập tức từ chối và ném lỗi `AppError("Tổng giá trị đơn hàng vượt quá hạn mức thanh toán COD cho phép (tối đa 2 tỷ VNĐ)", 400)`.
 
 ### 7.2. Đoạn Mã Chuẩn Triển khai trong OrderService
 
 ```typescript
+import { Prisma } from "@prisma/client";
 import { prisma } from "../config/db";
 import { AppError } from "../utils/AppError";
 import { generateOrderCode } from "../utils/orderCode";
@@ -309,7 +428,7 @@ interface CreateOrderItemInput {
 }
 
 interface CreateOrderInput {
-  userId?: string;
+  userId?: string; // Chỉ nhận từ req.user qua optionalAuth, KHÔNG nhận từ body
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
@@ -319,20 +438,14 @@ interface CreateOrderInput {
   items: CreateOrderItemInput[];
 }
 
-export async function createOrderService(input: CreateOrderInput) {
-  const { customerName, customerPhone, customerEmail, province, detailAddress, note, items, userId } = input;
-
+// Hàm thực thi 1 lần tạo đơn bên trong transaction
+async function executeCreateOrderTx(
+  input: CreateOrderInput,
+  sortedItems: Array<{ productId: string; quantity: number }>
+) {
+  const { customerName, customerPhone, customerEmail, province, detailAddress, note, userId } = input;
   const cleanPhone = normalizePhone(customerPhone);
   const fullAddress = `${detailAddress}, ${province}`;
-
-  const itemMap = new Map<string, number>();
-  for (const item of items) {
-    if (item.quantity <= 0) throw new AppError("Số lượng sản phẩm phải lớn hơn 0", 400);
-    itemMap.set(item.productId, (itemMap.get(item.productId) || 0) + item.quantity);
-  }
-
-  const sortedProductIds = Array.from(itemMap.keys()).sort();
-  const sortedItems = sortedProductIds.map(id => ({ productId: id, quantity: itemMap.get(id)! }));
 
   return await prisma.$transaction(async (tx) => {
     const orderItemsData: Array<{
@@ -347,6 +460,7 @@ export async function createOrderService(input: CreateOrderInput) {
     let totalAmount = 0;
 
     for (const item of sortedItems) {
+      // 1. Trừ kho nguyên tử có kiểm tra điều kiện mở bán (isActive) và tồn kho (stock >= quantity)
       const updateResult = await tx.product.updateMany({
         where: {
           id: item.productId,
@@ -364,7 +478,7 @@ export async function createOrderService(input: CreateOrderInput) {
           select: { name: true, stock: true, isActive: true }
         });
         if (!currentProd || !currentProd.isActive) {
-          throw new AppError(`Sản phẩm không tồn tại hoặc đã ngừng kinh doanh`, 409);
+          throw new AppError("Sản phẩm không tồn tại hoặc đã ngừng kinh doanh", 409);
         }
         throw new AppError(
           `Sản phẩm "${currentProd.name}" không đủ số lượng trong kho (còn ${currentProd.stock})`,
@@ -372,6 +486,7 @@ export async function createOrderService(input: CreateOrderInput) {
         );
       }
 
+      // 2. Đọc giá bán và thông tin sản phẩm trực tiếp từ DB (tuyệt đối không tin giá client)
       const product = await tx.product.findUniqueOrThrow({
         where: { id: item.productId },
         select: { id: true, name: true, salePrice: true, thumbnail: true }
@@ -379,6 +494,11 @@ export async function createOrderService(input: CreateOrderInput) {
 
       const lineTotal = product.salePrice * item.quantity;
       totalAmount += lineTotal;
+
+      // 3. Kiểm tra chống tràn số Int32 trên PostgreSQL (< 2.14 tỷ VNĐ)
+      if (totalAmount > 2_000_000_000) {
+        throw new AppError("Tổng giá trị đơn hàng vượt quá hạn mức thanh toán COD cho phép (tối đa 2 tỷ VNĐ)", 400);
+      }
 
       orderItemsData.push({
         productId: product.id,
@@ -390,22 +510,12 @@ export async function createOrderService(input: CreateOrderInput) {
       });
     }
 
-    let orderCode = "";
-    let isUnique = false;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const candidate = generateOrderCode();
-      const existing = await tx.order.findUnique({ where: { orderCode: candidate } });
-      if (!existing) {
-        orderCode = candidate;
-        isUnique = true;
-        break;
-      }
-    }
-    if (!isUnique) throw new AppError("Không thể tạo mã đơn hàng, vui lòng thử lại", 500);
-
-    const shippingFee = 0;
+    // 4. Sinh mã đơn hàng ngẫu nhiên (Ràng buộc UNIQUE trên DB là chốt chặn duy nhất, không findUnique trước)
+    const orderCode = generateOrderCode();
+    const shippingFee = 0; // v1: Miễn phí vận chuyển toàn quốc
     const finalAmount = totalAmount + shippingFee;
 
+    // 5. Tạo đơn hàng và chi tiết đơn hàng
     return await tx.order.create({
       data: {
         orderCode,
@@ -431,6 +541,51 @@ export async function createOrderService(input: CreateOrderInput) {
       }
     });
   });
+}
+
+// Hàm Service chính: Xử lý gộp/sắp xếp TRƯỚC transaction và Bắt lỗi P2002 để RETRY Ở NGOÀI Transaction
+export async function createOrderService(input: CreateOrderInput) {
+  // [BƯỚC 1 - NGOÀI TRANSACTION]: Gộp dòng trùng productId & Kiểm tra tổng số lượng <= 10
+  const itemMap = new Map<string, number>();
+  for (const item of input.items) {
+    const currentQty = itemMap.get(item.productId) || 0;
+    const newQty = currentQty + item.quantity;
+    if (newQty > 10) {
+      throw new AppError("Tổng số lượng cho mỗi sản phẩm trong đơn hàng không được vượt quá 10", 400);
+    }
+    itemMap.set(item.productId, newQty);
+  }
+
+  // [BƯỚC 2 - NGOÀI TRANSACTION]: Sắp xếp productId tăng dần để phòng ngừa Deadlock
+  const sortedProductIds = Array.from(itemMap.keys()).sort();
+  const sortedItems = sortedProductIds.map(id => ({ productId: id, quantity: itemMap.get(id)! }));
+
+  // [BƯỚC 3 - NGOÀI TRANSACTION]: Thử thực thi với cơ chế Retry tối đa 3 lần NẾU va chạm mã đơn (P2002 trên orderCode)
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await executeCreateOrderTx(input, sortedItems);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // Chỉ retry khi meta.target chứa orderCode; lỗi P2002 khác trả lỗi bình thường
+        const target = (error.meta?.target as string[] | string) || [];
+        const isOrderCodeConflict = Array.isArray(target)
+          ? target.includes("orderCode")
+          : typeof target === "string" && target.includes("orderCode");
+
+        if (isOrderCodeConflict && attempt < MAX_RETRIES) {
+          // Va chạm Unique orderCode: Retry lại toàn bộ hàm ngoài transaction để sinh mã mới
+          continue;
+        }
+      }
+      throw error;
+    }
+  }
+
+  throw new AppError("Không thể tạo mã đơn hàng duy nhất sau nhiều lần thử, vui lòng thử lại", 500);
 }
 ```
 
@@ -554,17 +709,34 @@ export async function deleteProductService(productId: string) {
 ### 8.1. Cấu hình Trust Proxy, Startup Validation & Kiểm Chứng Thực Nghiệm
 
 #### 1. Kiểm Tra Khởi Động Bắt Buộc (Fail-Fast Startup Validation)
-Ứng dụng Express **bắt buộc phải từ chối khởi động (`process.exit(1)`)** nếu biến môi trường `TRUST_PROXY_HOPS` không tồn tại hoặc không phải là một số nguyên dương hợp lệ ($\ge 1$). Điều này ngăn chặn việc ứng dụng khởi động với cấu hình proxy ngầm định sai lệch, gây tê liệt hệ thống rate limit hoặc mở toang lỗ hổng IP spoofing:
+Biến môi trường `TRUST_PROXY_HOPS` **bắt buộc phải được khai báo rõ ràng trong file cấu hình `.env`**, tuyệt đối không dùng giá trị mặc định ngầm định khi bị thiếu. Ứng dụng Express **từ chối khởi động ngay lập tức (`process.exit(1)`)** nếu giá trị này thiếu hoặc không hợp lệ:
+- **Quy tắc giá trị**: Bắt buộc là một số nguyên không âm ($\ge 0$).
+  - Giá trị `0`: Dành riêng cho môi trường **Local Development** khi lập trình viên chạy Node.js trực tiếp trên máy cục bộ, không đứng sau bất kỳ reverse proxy nào (`req.ip` lấy trực tiếp từ remote socket address).
+  - Giá trị $\ge 1$: Dành cho các môi trường có proxy phía trước (Staging / Production).
+- **Ràng buộc Production**: Nếu `process.env.NODE_ENV === "production"`, `TRUST_PROXY_HOPS` **bắt buộc phải $\ge 1$** (Render luôn có ít nhất 1 tầng load balancer/edge proxy phía trước). Nếu khai báo bằng `0` ở Production, ứng dụng sẽ từ chối khởi động fail-fast để ngăn chặn lỗi bảo mật gán nhầm IP proxy cho client.
 
 ```typescript
 // server/src/config/env.ts hoặc entrypoint server/src/app.ts:
 const rawHops = process.env.TRUST_PROXY_HOPS;
-if (!rawHops || !/^\d+$/.test(rawHops) || parseInt(rawHops, 10) < 1) {
-  console.error("FATAL: TRUST_PROXY_HOPS bắt buộc phải là một số nguyên dương hợp lệ (>= 1). Ứng dụng từ chối khởi động!");
+
+// 1. Bắt buộc khai báo rõ ràng, không chấp nhận undefined, chuỗi rỗng hoặc định dạng không phải số nguyên không âm
+if (rawHops === undefined || rawHops === "" || !/^\d+$/.test(rawHops)) {
+  console.error(
+    "FATAL: Biến môi trường TRUST_PROXY_HOPS bắt buộc phải được khai báo rõ ràng và là một số nguyên không âm (>= 0). Ứng dụng từ chối khởi động!"
+  );
   process.exit(1);
 }
 
 const trustProxyHops = parseInt(rawHops, 10);
+
+// 2. Ràng buộc nghiêm ngặt trên môi trường Production
+if (process.env.NODE_ENV === "production" && trustProxyHops < 1) {
+  console.error(
+    "FATAL: Trên môi trường Production, TRUST_PROXY_HOPS bắt buộc phải >= 1 (Render nằm sau ít nhất 1 reverse proxy). Ứng dụng từ chối khởi động!"
+  );
+  process.exit(1);
+}
+
 app.set("trust proxy", trustProxyHops);
 ```
 
